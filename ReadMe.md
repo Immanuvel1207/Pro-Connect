@@ -49,7 +49,7 @@ Pro-connect is an ***innovative developer collaboration platform*** designed to 
 
 ---
 
-## 🎯 Why Pro-connect?
+## 🎯 Why Pro-connect ?
 
 - **Bridges the gap between developers and collaboration opportunities**  
 - **Provides a structured way to find help within and beyond college**  
