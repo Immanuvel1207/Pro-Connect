@@ -22,20 +22,20 @@ Pro-connect is an ***innovative developer collaboration platform*** designed to 
 ## ⚙️ How It Works
 
 ### 📝 **1. User Registration & Profile Creation**
-    ✅ Developers sign up with their credentials and specify their skills and interests.  
-    ✅ Profiles include **GitHub links, college names, and preferred technologies**.
+✅ Developers sign up with their credentials and specify their skills and interests.  
+✅ Profiles include **GitHub links, college names, and preferred technologies**.
 
 ### 📌 **2. Project Posting & Collaboration**
-    ✅ Users can create **project cards** with **titles, abstracts, descriptions, and skill requirements**.  
-    ✅ Other developers can view, express interest, or apply to contribute to projects.
+✅ Users can create **project cards** with **titles, abstracts, descriptions, and skill requirements**.  
+✅ Other developers can view, express interest, or apply to contribute to projects.
 
 ### 🔍 **3. Help Requests & Recommendations**
-    ✅ Developers can **post requests** for specific roles (e.g., *"Looking for a React Developer"*).  
-    ✅ Other users can **recommend suitable developers** from their network.
+✅ Developers can **post requests** for specific roles (e.g., *"Looking for a React Developer"*).  
+✅ Other users can **recommend suitable developers** from their network.
 
 ### 💬 **4. Messaging & Real-Time Collaboration**
-    ✅ Users can communicate via an **in-built chat system powered by WebSockets**.  
-    ✅ Instant messaging ensures **smooth coordination and project discussions**.
+✅ Users can communicate via an **in-built chat system powered by WebSockets**.  
+✅ Instant messaging ensures **smooth coordination and project discussions**.
 
 ---
 
