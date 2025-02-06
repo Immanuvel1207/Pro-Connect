@@ -19,6 +19,36 @@ Pro-connect is an ***innovative developer collaboration platform*** designed to 
 
 ---
 
+## 🚀 Deployment
+
+To deploy the Pro-connect frontend, follow these steps:
+
+1. **Clone the repository**:
+    ```sh
+    git clone https://github.com/your-username/pro-connect-frontend.git
+    cd pro-connect-frontend
+    ```
+
+2. **Install dependencies**:
+    ```sh
+    npm install
+    ```
+
+3. **Build the project**:
+    ```sh
+    npm run build
+    ```
+
+4. **Deploy the build**:
+    - You can deploy the contents of the `build` folder to any static site hosting service like Vercel, Netlify, or GitHub Pages.
+
+5. **Start the development server** (optional):
+    ```sh
+    npm start
+    ```
+
+---
+
 ## ⚙️ How It Works
 
 ### 📝 **1. User Registration & Profile Creation**
