@@ -1,7 +1,7 @@
 # 🌟 Pro-connect 🚀
 
 ## 🎯 Overview
-Pro-connect is an **innovative developer collaboration platform** designed to **bridge the gap between developers** seeking help and those willing to contribute their skills. Unlike GitHub, Pro-connect does not provide version control or file uploads but instead focuses on **networking, collaboration, and communication** among developers.
+Pro-connect is an ***innovative developer collaboration platform*** designed to **bridge the gap between developers** seeking help and those willing to contribute their skills. Unlike GitHub, Pro-connect does not provide version control or file uploads but instead focuses on **networking, collaboration, and communication** among developers.
 
 ---
 
@@ -22,20 +22,20 @@ Pro-connect is an **innovative developer collaboration platform** designed to **
 ## ⚙️ How It Works
 
 ### 📝 **1. User Registration & Profile Creation**
-✅ Developers sign up with their credentials and specify their skills and interests.  
-✅ Profiles include **GitHub links, college names, and preferred technologies**.
+    ✅ Developers sign up with their credentials and specify their skills and interests.  
+    ✅ Profiles include **GitHub links, college names, and preferred technologies**.
 
 ### 📌 **2. Project Posting & Collaboration**
-✅ Users can create **project cards** with **titles, abstracts, descriptions, and skill requirements**.  
-✅ Other developers can view, express interest, or apply to contribute to projects.
+    ✅ Users can create **project cards** with **titles, abstracts, descriptions, and skill requirements**.  
+    ✅ Other developers can view, express interest, or apply to contribute to projects.
 
 ### 🔍 **3. Help Requests & Recommendations**
-✅ Developers can **post requests** for specific roles (e.g., *"Looking for a React Developer"*).  
-✅ Other users can **recommend suitable developers** from their network.
+    ✅ Developers can **post requests** for specific roles (e.g., *"Looking for a React Developer"*).  
+    ✅ Other users can **recommend suitable developers** from their network.
 
 ### 💬 **4. Messaging & Real-Time Collaboration**
-✅ Users can communicate via an **in-built chat system powered by WebSockets**.  
-✅ Instant messaging ensures **smooth coordination and project discussions**.
+    ✅ Users can communicate via an **in-built chat system powered by WebSockets**.  
+    ✅ Instant messaging ensures **smooth coordination and project discussions**.
 
 ---
 
@@ -51,11 +51,11 @@ Pro-connect is an **innovative developer collaboration platform** designed to **
 
 ## 🎯 Why Pro-connect?
 
-✅ **Bridges the gap between developers and collaboration opportunities**  
-✅ **Provides a structured way to find help within and beyond college**  
-✅ **Encourages skill-sharing and networking among developers**  
-✅ **Simplifies project discovery and communication**  
-✅ **Creates a strong developer community for future innovations**  
+- **Bridges the gap between developers and collaboration opportunities**  
+- **Provides a structured way to find help within and beyond college**  
+- **Encourages skill-sharing and networking among developers**  
+- **Simplifies project discovery and communication**  
+- **Creates a strong developer community for future innovations**  
 
 ---
 
