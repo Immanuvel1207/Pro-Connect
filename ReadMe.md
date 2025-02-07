@@ -95,6 +95,8 @@ To deploy the Pro-connect frontend, follow these steps:
 ✨ **Portfolio Showcase** – Developers can display their past work and achievements.  
 
 ---
+![wire frame](./proconnect.png) 
+---
 
 ## 🏆 Conclusion
 Pro-connect is the **ultimate networking and collaboration platform** for developers. It enables users to **find teammates, contribute to exciting projects, and build a thriving tech community**. 🚀🔥
