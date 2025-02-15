@@ -1,0 +1,1356 @@
+I am doing a pro connect project..
+In this first they'll see the home page then they can login/register 
+they can see the projects pages where they can navigate and see all the project cards posted by others .. 
+Also they can view the project and see its details too..
+While posting the project itself, if the post-er wants some help in the project , he'll specify the type of help he need (skill required) then if the viewer while looking the project details, if he can help the post-er then the user can post his views on the discussion forom in that post .. 
+Each logged in user has a profile page , like Instagram , it must display all the posts posted by that user..
+
+In the project page , the user must be able to search the projects, also , in another section he must be able to search the user , just like Instagram .. Hope you understand..
+
+Also there in the user page , he can see all the post by that user..
+
+Keep a chatbox where we can chat with others realtime...
+
+
+
+I have implemented some 
+
+backend:
+
+/config
+db.js
+const mongoose = require("mongoose");
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+    console.log("MongoDB Connected");
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDB;
+
+
+
+/middleware
+authMiddleware.js
+const jwt = require("jsonwebtoken")
+const User = require("../models/User")
+
+const authMiddleware = async (req, res, next) => {
+  let token
+
+  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+    try {
+      token = req.headers.authorization.split(" ")[1]
+      const decoded = jwt.verify(token, process.env.JWT_SECRET)
+      req.user = await User.findById(decoded.id).select("-password")
+      next()
+    } catch (error) {
+      res.status(401).json({ message: "Not authorized, token failed" })
+    }
+  }
+
+  if (!token) {
+    res.status(401).json({ message: "Not authorized, no token" })
+  }
+}
+
+module.exports = authMiddleware
+
+
+
+/models
+
+Message.js
+const mongoose = require("mongoose");
+
+const MessageSchema = new mongoose.Schema({
+  sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  receiver: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  content: { type: String, required: true },
+  timestamp: { type: Date, default: Date.now },
+});
+
+module.exports = mongoose.model("Message", MessageSchema);
+
+
+Project.js
+const mongoose = require("mongoose");
+
+const ProjectSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+  githubLink: { type: String, required: true },
+  requiredSkills: { type: [String], required: true },
+  postedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  createdAt: { type: Date, default: Date.now },
+});
+
+module.exports = mongoose.model("Project", ProjectSchema);
+
+
+User.js
+const mongoose = require("mongoose");
+
+const UserSchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  githubID: { type: String, required: true },
+  skills: { type: [String], required: true },
+  college: { type: String, required: true },
+});
+
+module.exports = mongoose.model("User", UserSchema);
+
+
+
+
+
+/routes
+authRoutes.js
+const express = require("express");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const router = express.Router();
+
+router.post("/register", async (req, res) => {
+  const { name, email, password, githubID, skills, college } = req.body;
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const user = new User({ name, email, password: hashedPassword, githubID, skills, college });
+  await user.save();
+  res.json({ message: "User Registered" });
+});
+
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) return res.status(400).json({ message: "User not found" });
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) return res.status(400).json({ message: "Invalid Credentials" });
+
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  res.json({ token, user });
+});
+
+module.exports = router;
+
+
+
+messageRoutes.js
+const express = require("express");
+const Message = require("../models/Message");
+const authMiddleware = require("../middleware/authMiddleware");
+const router = express.Router();
+
+// Send a message
+router.post("/send", authMiddleware, async (req, res) => {
+  const { receiver, content } = req.body;
+  const message = new Message({ sender: req.user.id, receiver, content });
+  await message.save();
+  res.json({ message: "Message Sent", message });
+});
+
+// Fetch messages between two users
+router.get("/:userId", authMiddleware, async (req, res) => {
+  const messages = await Message.find({
+    $or: [
+      { sender: req.user.id, receiver: req.params.userId },
+      { sender: req.params.userId, receiver: req.user.id }
+    ]
+  }).sort({ timestamp: 1 });
+
+  res.json(messages);
+});
+
+module.exports = router;
+
+
+projectRoutes.js
+const express = require("express");
+const Project = require("../models/Project");
+const authMiddleware = require("../middleware/authMiddleware");
+const router = express.Router();
+
+// Create a new project
+router.post("/create", authMiddleware, async (req, res) => {
+  const { title, description, githubLink, requiredSkills } = req.body;
+
+  try {
+    const project = new Project({
+      title,
+      description,
+      githubLink,
+      requiredSkills: requiredSkills.split(","),
+      postedBy: req.user.id,
+    });
+
+    await project.save();
+    res.status(201).json({ message: "Project Created Successfully", project });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
+});
+
+// Search projects
+router.get("/search", async (req, res) => {
+  try {
+    const searchTerm = req.query.term;
+    const projects = await Project.find({
+      $or: [
+        { title: { $regex: searchTerm, $options: 'i' } },
+        { description: { $regex: searchTerm, $options: 'i' } },
+        { requiredSkills: { $regex: searchTerm, $options: 'i' } }
+      ]
+    }).populate("postedBy", "name email githubID");
+    res.json(projects);
+  } catch (error) {
+    res.status(500).json({ message: "Error searching projects", error });
+  }
+});
+
+// Get user's projects
+router.get("/user/:userId", async (req, res) => {
+  try {
+    const projects = await Project.find({ postedBy: req.params.userId })
+      .populate("postedBy", "name email githubID");
+    res.json(projects);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching user projects", error });
+  }
+});
+
+// Get all projects
+router.get("/all", async (req, res) => {
+  try {
+    const projects = await Project.find()
+      .populate("postedBy", "name email githubID")
+      .sort({ createdAt: -1 });
+    res.json(projects);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching projects", error });
+  }
+});
+
+module.exports = router;
+
+
+userRoutes.js
+const express = require("express");
+const User = require("../models/User");
+const authMiddleware = require("../middleware/authMiddleware");
+const router = express.Router();
+
+// Search users
+router.get("/search", async (req, res) => {
+  try {
+    const searchTerm = req.query.term;
+    const users = await User.find({
+      $or: [
+        { name: { $regex: searchTerm, $options: 'i' } },
+        { college: { $regex: searchTerm, $options: 'i' } }
+      ]
+    }).select("-password");
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Error searching users", error });
+  }
+});
+
+// Get user profile
+router.get("/profile/:userId", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching user profile", error });
+  }
+});
+
+module.exports = router;
+
+
+
+server.js
+const express = require("express");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const connectDB = require("./config/db");
+const http = require("http");
+const socketIo = require("socket.io");
+
+dotenv.config();
+connectDB();
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"]
+  }
+});
+
+app.use(express.json());
+app.use(cors());
+
+// Routes
+app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/projects", require("./routes/projectRoutes"));
+app.use("/api/messages", require("./routes/messageRoutes"));
+app.use("/api/users", require("./routes/userRoutes")); // New route for user search
+
+// Socket.io connection
+io.on("connection", (socket) => {
+  console.log("New client connected");
+
+  socket.on("join_room", (roomId) => {
+    socket.join(roomId);
+  });
+
+  socket.on("send_message", (data) => {
+    io.to(data.roomId).emit("receive_message", data);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected");
+  });
+});
+
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+
+
+
+frontend
+
+app.js
+
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import NavigationBar from './components/Navbar';
+import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
+import AddProject from './pages/AddProject';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Profile from './pages/Profile';
+import UserProfile from './pages/UserProfile';
+import Messages from './pages/Messages';
+import ProjectDetails from './pages/ProjectDetails';
+import PrivateRoute from './components/PrivateRoute';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import './App.css';
+
+const App = () => {
+  return (
+    <Router>
+      <NavigationBar />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <Dashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/add-project"
+          element={
+            <PrivateRoute>
+              <AddProject />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <Profile />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <PrivateRoute>
+              <Messages />
+            </PrivateRoute>
+          }
+        />
+        <Route path="/projects/:id" element={<ProjectDetails />} />
+        <Route path="/user/:id" element={<UserProfile />} />
+      </Routes>
+    </Router>
+  );
+};
+
+export default App;
+
+
+
+
+
+/components
+ChatBox.js
+import React, { useState, useEffect } from "react";
+import io from "socket.io-client";
+
+const socket = io("http://localhost:5000");
+
+const ChatBox = () => {
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState([]);
+
+  useEffect(() => {
+    socket.on("receive_message", (msg) => {
+      setMessages((prev) => [...prev, msg]);
+    });
+  }, []);
+
+  const sendMessage = () => {
+    socket.emit("send_message", message);
+    setMessages([...messages, message]);
+    setMessage("");
+  };
+
+  return (
+    <div className="container">
+      <h4>Chat</h4>
+      <div className="chat-box">
+        {messages.map((msg, index) => (
+          <p key={index}>{msg}</p>
+        ))}
+      </div>
+      <input type="text" value={message} onChange={(e) => setMessage(e.target.value)} />
+      <button className="btn btn-primary" onClick={sendMessage}>Send</button>
+    </div>
+  );
+};
+
+export default ChatBox;
+
+
+Navbar.js
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Navbar, Nav, Container, Form, FormControl, Button, Dropdown } from 'react-bootstrap';
+
+const NavigationBar = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const navigate = useNavigate();
+  const isAuthenticated = localStorage.getItem('token');
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/');
+  };
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    try {
+      const projectsResponse = await fetch(`http://localhost:5000/api/projects/search?term=${searchTerm}`);
+      const projectsData = await projectsResponse.json();
+      
+      const usersResponse = await fetch(`http://localhost:5000/api/users/search?term=${searchTerm}`);
+      const usersData = await usersResponse.json();
+
+      setSearchResults([...projectsData, ...usersData]);
+    } catch (error) {
+      console.error('Error searching:', error);
+    }
+  };
+
+  return (
+    <Navbar bg="primary" variant="dark" expand="lg">
+      <Container>
+        <Navbar.Brand as={Link} to="/">Pro-Connect</Navbar.Brand>
+        <Navbar.Toggle aria-controls="basic-navbar-nav" />
+        <Navbar.Collapse id="basic-navbar-nav">
+          <Nav className="me-auto">
+            <Nav.Link as={Link} to="/">Home</Nav.Link>
+            <Nav.Link as={Link} to="/projects">Projects</Nav.Link>
+            {isAuthenticated && (
+              <>
+                <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
+                <Nav.Link as={Link} to="/messages">Messages</Nav.Link>
+              </>
+            )}
+          </Nav>
+          <Form className="d-flex" onSubmit={handleSearch}>
+            <FormControl
+              type="search"
+              placeholder="Search projects or users"
+              className="me-2"
+              aria-label="Search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <Button variant="outline-light" type="submit">Search</Button>
+          </Form>
+          {searchResults.length > 0 && (
+            <Dropdown>
+              <Dropdown.Menu show>
+                {searchResults.map((result) => (
+                  <Dropdown.Item
+                    key={result._id}
+                    as={Link}
+                    to={result.title ? `/projects/${result._id}` : `/user/${result._id}`}
+                  >
+                    {result.title || result.name}
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+          <Nav>
+            {isAuthenticated ? (
+              <>
+                <Nav.Link as={Link} to="/profile">Profile</Nav.Link>
+                <Button variant="light" onClick={handleLogout}>Logout</Button>
+              </>
+            ) : (
+              <>
+                <Nav.Link as={Link} to="/login">Login</Nav.Link>
+                <Nav.Link as={Link} to="/register">Register</Nav.Link>
+              </>
+            )}
+          </Nav>
+        </Navbar.Collapse>
+      </Container>
+    </Navbar>
+  );
+};
+
+export default NavigationBar;
+
+
+
+PrivateRoute.js
+import { Navigate } from "react-router-dom";
+
+const PrivateRoute = ({ children }) => {
+  const isAuthenticated = localStorage.getItem("token");
+  
+  return isAuthenticated ? children : <Navigate to="/login" />;
+};
+
+export default PrivateRoute;
+
+
+
+ProjectCard.js
+import React from "react";
+import { Link } from "react-router-dom";
+
+const ProjectCard = ({ project }) => {
+  return (
+    <div className="col-md-4">
+      <div className="card mb-3">
+        <div className="card-body">
+          <h5 className="card-title">{project.title}</h5>
+          <p className="card-text">{project.description.substring(0, 100)}...</p>
+          <Link to={`/projects/${project._id}`} className="btn btn-primary">View Details</Link>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ProjectCard;
+
+
+SearchBar.js
+import React, { useState } from "react";
+import { Form, InputGroup } from "react-bootstrap";
+
+const SearchBar = ({ onSearch, placeholder }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const handleSearch = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    onSearch(value);
+  };
+
+  return (
+    <InputGroup className="mb-3">
+      <Form.Control
+        placeholder={placeholder}
+        value={searchTerm}
+        onChange={handleSearch}
+      />
+    </InputGroup>
+  );
+};
+
+export default SearchBar;
+
+
+
+
+
+/pages
+AddProject.js
+import { useState } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
+
+const AddProject = () => {
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    githubLink: "",
+    requiredSkills: "",
+  });
+
+  const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem("token");
+
+    try {
+      await axios.post("http://localhost:5000/api/projects/create", formData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      alert("Project Added Successfully!");
+      navigate("/dashboard"); // Redirect to dashboard
+    } catch (error) {
+      console.error("Project creation failed:", error.response?.data?.message || error.message);
+    }
+  };
+
+  return (
+    <div className="container mt-5">
+      <h2>Add New Project</h2>
+      <form onSubmit={handleSubmit}>
+        <input type="text" name="title" className="form-control mb-3" placeholder="Project Title" onChange={handleChange} required />
+        <textarea name="description" className="form-control mb-3" placeholder="Project Description" onChange={handleChange} required />
+        <input type="text" name="githubLink" className="form-control mb-3" placeholder="GitHub Repository Link" onChange={handleChange} required />
+        <input type="text" name="requiredSkills" className="form-control mb-3" placeholder="Required Skills (comma-separated)" onChange={handleChange} required />
+        <button type="submit" className="btn btn-primary">Add Project</button>
+      </form>
+    </div>
+  );
+};
+
+export default AddProject;
+
+
+Dashboard.js
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { Link } from "react-router-dom";
+import ProjectCard from "../components/ProjectCard";
+
+const Dashboard = () => {
+  const [projects, setProjects] = useState([]);
+
+  useEffect(() => {
+    axios.get("http://localhost:5000/api/projects/all").then(({ data }) => setProjects(data));
+  }, []);
+
+  return (
+    <div className="container mt-4">
+      <h2>Project Listings</h2>
+      <Link to="/add-project" className="btn btn-success mb-3">➕ Add Project</Link>
+      <div className="row">
+        {projects.map((project) => (
+          <ProjectCard key={project._id} project={project} />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
+
+
+
+Home.js
+import React from "react";
+import { Link } from "react-router-dom";
+import { Container, Row, Col, Button } from "react-bootstrap";
+
+const Home = () => {
+  return (
+    <div className="home-page">
+      <div className="hero-section text-center py-5 bg-primary text-white">
+        <Container>
+          <h1 className="display-4 mb-4">Welcome to Pro-Connect</h1>
+          <p className="lead mb-4">
+            Connect with fellow developers, share projects, and collaborate globally!
+          </p>
+          <div className="cta-buttons">
+            <Link to="/register" className="btn btn-light btn-lg mx-2">
+              Get Started
+            </Link>
+            <Link to="/login" className="btn btn-outline-light btn-lg mx-2">
+              Sign In
+            </Link>
+          </div>
+        </Container>
+      </div>
+
+      <Container className="py-5">
+        <Row className="features-section text-center">
+          <Col md={4} className="mb-4">
+            <div className="feature-card p-4">
+              <i className="fas fa-project-diagram fa-3x mb-3"></i>
+              <h3>Share Projects</h3>
+              <p>Showcase your projects and get feedback from the community</p>
+            </div>
+          </Col>
+          <Col md={4} className="mb-4">
+            <div className="feature-card p-4">
+              <i className="fas fa-users fa-3x mb-3"></i>
+              <h3>Find Collaborators</h3>
+              <p>Connect with developers who match your project needs</p>
+            </div>
+          </Col>
+          <Col md={4} className="mb-4">
+            <div className="feature-card p-4">
+              <i className="fas fa-comments fa-3x mb-3"></i>
+              <h3>Real-time Chat</h3>
+              <p>Communicate with potential collaborators instantly</p>
+            </div>
+          </Col>
+        </Row>
+      </Container>
+    </div>
+  );
+};
+
+export default Home;
+
+
+
+Login.js
+
+import { useState } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";  // ✅ Use useNavigate instead of useHistory
+
+const Login = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();  // ✅ Correct Hook
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const { data } = await axios.post("http://localhost:5000/api/auth/login", { email, password });
+      localStorage.setItem("token", data.token);
+      navigate("/dashboard");  // ✅ Use navigate instead of history.push
+    } catch (error) {
+      console.error("Login failed:", error.response?.data?.message || error.message);
+    }
+  };
+
+  return (
+    <div className="container mt-5">
+      <h2>Login</h2>
+      <form onSubmit={handleLogin}>
+        <input type="email" className="form-control mb-3" placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
+        <input type="password" className="form-control mb-3" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
+        <button type="submit" className="btn btn-primary">Login</button>
+      </form>
+    </div>
+  );
+};
+
+export default Login;
+
+
+Messages.js
+import React, { useState, useEffect, useRef } from 'react';
+import { Container, Row, Col, Form, Button, ListGroup } from 'react-bootstrap';
+import io from 'socket.io-client';
+
+const socket = io('http://localhost:5000');
+
+const Messages = () => {
+  const [conversations, setConversations] = useState([]);
+  const [currentChat, setCurrentChat] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const scrollRef = useRef();
+
+  useEffect(() => {
+    // Fetch user's conversations
+    const fetchConversations = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/messages/conversations', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        const data = await response.json();
+        setConversations(data);
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+      }
+    };
+
+    fetchConversations();
+
+    // Listen for incoming messages
+    socket.on('receive_message', (message) => {
+      setMessages((prevMessages) => [...prevMessages, message]);
+    });
+
+    return () => {
+      socket.off('receive_message');
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (newMessage.trim() && currentChat) {
+      const messageData = {
+        sender: localStorage.getItem('userId'),
+        content: newMessage,
+        conversationId: currentChat._id,
+      };
+
+      // Emit message to server
+      socket.emit('send_message', messageData);
+
+      // Add message to state
+      setMessages([...messages, messageData]);
+      setNewMessage('');
+
+      // Save message to database
+      try {
+        await fetch('http://localhost:5000/api/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify(messageData),
+        });
+      } catch (error) {
+        console.error('Error saving message:', error);
+      }
+    }
+  };
+
+  const handleChatChange = async (conversation) => {
+    setCurrentChat(conversation);
+    try {
+      const response = await fetch(`http://localhost:5000/api/messages/${conversation._id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      setMessages(data);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
+
+  return (
+    <Container className="mt-4">
+      <Row>
+        <Col md={4}>
+          <ListGroup>
+            {conversations.map((c) => (
+              <ListGroup.Item
+                key={c._id}
+                action
+                onClick={() => handleChatChange(c)}
+                active={currentChat && currentChat._id === c._id}
+              >
+                {c.participants.find(p => p._id !== localStorage.getItem('userId')).name}
+              </ListGroup.Item>
+            ))}
+          </ListGroup>
+        </Col>
+        <Col md={8}>
+          <div className="chat-box">
+            <div className="chat-messages">
+              {messages.map((m, index) => (
+                <div
+                  key={index}
+                  className={`message ${m.sender === localStorage.getItem('userId') ? 'sent' : 'received'}`}
+                  ref={scrollRef}
+                >
+                  {m.content}
+                </div>
+              ))}
+            </div>
+            <Form onSubmit={handleSubmit}>
+              <Form.Group className="mt-3">
+                <Form.Control
+                  type="text"
+                  placeholder="Type a message..."
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                />
+              </Form.Group>
+              <Button type="submit" className="mt-2">Send</Button>
+            </Form>
+          </div>
+        </Col>
+      </Row>
+    </Container>
+  );
+};
+
+export default Messages;
+
+
+
+Profile.js
+import React, { useState, useEffect } from 'react';
+import { Container, Row, Col, Card, Button, Form } from 'react-bootstrap';
+import { Link } from 'react-router-dom';
+import ProjectCard from '../components/ProjectCard';
+
+const Profile = () => {
+  const [user, setUser] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedUser, setEditedUser] = useState({});
+
+  useEffect(() => {
+    fetchUserData();
+    fetchUserProjects();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/users/profile', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      setUser(data);
+      setEditedUser(data);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
+  const fetchUserProjects = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/projects/user', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      setProjects(data);
+    } catch (error) {
+      console.error('Error fetching user projects:', error);
+    }
+  };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(editedUser)
+      });
+      const data = await response.json();
+      setUser(data);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    }
+  };
+
+  const handleChange = (e) => {
+    setEditedUser({ ...editedUser, [e.target.name]: e.target.value });
+  };
+
+  if (!user) return <div>Loading...</div>;
+
+  return (
+    <Container className="mt-4">
+      <Row>
+        <Col md={4}>
+          <Card>
+            <Card.Body>
+              <Card.Title>{user.name}</Card.Title>
+              {isEditing ? (
+                <Form>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Name</Form.Label>
+                    <Form.Control
+                      type="text"
+                      name="name"
+                      value={editedUser.name}
+                      onChange={handleChange}
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Email</Form.Label>
+                    <Form.Control
+                      type="email"
+                      name="email"
+                      value={editedUser.email}
+                      onChange={handleChange}
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Skills</Form.Label>
+                    <Form.Control
+                      type="text"
+                      name="skills"
+                      value={editedUser.skills.join(', ')}
+                      onChange={(e) => setEditedUser({ ...editedUser, skills: e.target.value.split(', ') })}
+                    />
+                  </Form.Group>
+                  <Button variant="primary" onClick={handleSave}>Save</Button>
+                </Form>
+              ) : (
+                <>
+                  <Card.Text>Email: {user.email}</Card.Text>
+                  <Card.Text>GitHub: {user.githubID}</Card.Text>
+                  <Card.Text>Skills: {user.skills.join(', ')}</Card.Text>
+                  <Card.Text>College: {user.college}</Card.Text>
+                  <Button variant="primary" onClick={handleEdit}>Edit Profile</Button>
+                </>
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={8}>
+          <h2>My Projects</h2>
+          <Row>
+            {projects.map(project => (
+              <Col md={6} key={project._id}>
+                <ProjectCard project={project} />
+              </Col>
+            ))}
+          </Row>
+          <Link to="/add-project" className="btn btn-success mt-3">Add New Project</Link>
+        </Col>
+      </Row>
+    </Container>
+  );
+};
+
+export default Profile;
+
+
+ProjectDetails.js
+import React, { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Button } from 'react-bootstrap';
+
+const ProjectDetails = () => {
+  const [project, setProject] = useState(null);
+  const { id } = useParams();
+
+  useEffect(() => {
+    fetchProjectDetails();
+  }, [id]);
+
+  const fetchProjectDetails = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/projects/${id}`);
+      const data = await response.json();
+      setProject(data);
+    } catch (error) {
+      console.error('Error fetching project details:', error);
+    }
+  };
+
+  if (!project) return <div>Loading...</div>;
+
+  return (
+    <Container className="mt-4">
+      <Card>
+        <Card.Body>
+          <Card.Title>{project.title}</Card.Title>
+          <Card.Text>{project.description}</Card.Text>
+          <Card.Text>
+            <strong>Required Skills:</strong> {project.requiredSkills.join(', ')}
+          </Card.Text>
+          <Card.Text>
+            <strong>GitHub Link:</strong>{' '}
+            <a href={project.githubLink} target="_blank" rel="noopener noreferrer">
+              {project.githubLink}
+            </a>
+          </Card.Text>
+          <Card.Text>
+            <strong>Posted By:</strong>{' '}
+            <Link to={`/user/${project.postedBy._id}`}>{project.postedBy.name}</Link>
+          </Card.Text>
+          <Button
+            as={Link}
+            to={`/messages?userId=${project.postedBy._id}`}
+            variant="primary"
+          >
+            Contact Project Owner
+          </Button>
+        </Card.Body>
+      </Card>
+    </Container>
+  );
+};
+
+export default ProjectDetails;
+
+
+
+Register.js
+import { useState } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";  // ✅ Correct navigation method
+
+const Register = () => {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    githubID: "",
+    skills: "",
+    college: "",
+  });
+
+  const navigate = useNavigate();  // ✅ Replaces useHistory()
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post("http://localhost:5000/api/auth/register", formData);
+      alert("Registration successful! Please login.");
+      navigate("/login");  // ✅ Correct way to navigate in React Router v6
+    } catch (error) {
+      console.error("Registration failed:", error.response?.data?.message || error.message);
+    }
+  };
+
+  return (
+    <div className="container mt-5">
+      <h2>Register</h2>
+      <form onSubmit={handleRegister}>
+        <input type="text" name="name" className="form-control mb-3" placeholder="Name" onChange={handleChange} required />
+        <input type="email" name="email" className="form-control mb-3" placeholder="Email" onChange={handleChange} required />
+        <input type="password" name="password" className="form-control mb-3" placeholder="Password" onChange={handleChange} required />
+        <input type="text" name="githubID" className="form-control mb-3" placeholder="GitHub ID" onChange={handleChange} required />
+        <input type="text" name="skills" className="form-control mb-3" placeholder="Skills (comma-separated)" onChange={handleChange} required />
+        <input type="text" name="college" className="form-control mb-3" placeholder="College Name" onChange={handleChange} required />
+        <button type="submit" className="btn btn-primary">Register</button>
+      </form>
+      <p className="mt-3">
+        Already have an account? <a href="/login">Login here</a>
+      </p>
+    </div>
+  );
+};
+
+export default Register;
+
+UserProfile.js
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { Container, Row, Col, Card } from 'react-bootstrap';
+import ProjectCard from '../components/ProjectCard';
+
+const UserProfile = () => {
+  const [user, setUser] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const { id } = useParams();
+
+  useEffect(() => {
+    fetchUserData();
+    fetchUserProjects();
+  }, [id]);
+
+  const fetchUserData = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/profile/${id}`);
+      const data = await response.json();
+      setUser(data);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
+  const fetchUserProjects = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/projects/user/${id}`);
+      const data = await response.json();
+      setProjects(data);
+    } catch (error) {
+      console.error('Error fetching user projects:', error);
+    }
+  };
+
+  if (!user) return <div>Loading...</div>;
+
+  return (
+    <Container className="mt-4">
+      <Row>
+        <Col md={4}>
+          <Card>
+            <Card.Body>
+              <Card.Title>{user.name}</Card.Title>
+              <Card.Text>Email: {user.email}</Card.Text>
+              <Card.Text>GitHub: {user.githubID}</Card.Text>
+              <Card.Text>Skills: {user.skills.join(', ')}</Card.Text>
+              <Card.Text>College: {user.college}</Card.Text>
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={8}>
+          <h2>{user.name}'s Projects</h2>
+          <Row>
+            {projects.map(project => (
+              <Col md={6} key={project._id}>
+                <ProjectCard project={project} />
+              </Col>
+            ))}
+          </Row>
+        </Col>
+      </Row>
+    </Container>
+  );
+};
+
+export default UserProfile;
+
+
+App.css
+/* Hero Section */
+.hero-section {
+  min-height: 500px;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+}
+
+/* Feature Cards */
+.feature-card {
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+}
+
+/* Project Cards */
+.project-card {
+  transition: transform 0.3s ease;
+  height: 100%;
+}
+
+.project-card:hover {
+  transform: translateY(-5px);
+}
+
+/* Chat Box */
+.chat-container {
+  height: 500px;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+}
+
+.chat-messages {
+  height: 400px;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+.message {
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.message-sent {
+  background-color: #0d6efd;
+  color: white;
+  margin-left: auto;
+  max-width: 70%;
+}
+
+.message-received {
+  background-color: #f8f9fa;
+  max-width: 70%;
+}
+
+/* Profile Page */
+.profile-header {
+  background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+  color: white;
+  padding: 40px 0;
+  margin-bottom: 30px;
+}
+
+.profile-avatar {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  border: 5px solid white;
+}
+
+/* Search Results */
+.search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 0 0 10px 10px;
+  z-index: 1000;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .hero-section {
+    min-height: 400px;
+  }
+  
+  .feature-card {
+    margin-bottom: 20px;
+  }
+}
+
+
+
+There is no home page , design a home page too..
+which default goes there , only if wished , i need to login, also after login , give an option to logout..
+
+
+
+Generate the whole code
