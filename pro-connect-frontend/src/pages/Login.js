@@ -1,33 +1,51 @@
-import { useState } from "react";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";  // ✅ Use useNavigate instead of useHistory
+import React, { useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import './Auth.css';
 
-const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const navigate = useNavigate();  // ✅ Correct Hook
+function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const { login } = useContext(AuthContext);
+  const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      const { data } = await axios.post("http://localhost:5000/api/auth/login", { email, password });
-      localStorage.setItem("token", data.token);
-      navigate("/dashboard");  // ✅ Use navigate instead of history.push
-    } catch (error) {
-      console.error("Login failed:", error.response?.data?.message || error.message);
+    setError('');
+    
+    const success = await login(email, password);
+    if (success) {
+      navigate('/');
+      window.location.reload(); // Force refresh to update auth state
+    } else {
+      setError('Invalid email or password');
     }
   };
 
   return (
-    <div className="container mt-5">
+    <div className="auth-container">
       <h2>Login</h2>
-      <form onSubmit={handleLogin}>
-        <input type="email" className="form-control mb-3" placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
-        <input type="password" className="form-control mb-3" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
-        <button type="submit" className="btn btn-primary">Login</button>
+      {error && <p className="error">{error}</p>}
+      <form onSubmit={handleSubmit}>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <button type="submit">Login</button>
       </form>
     </div>
   );
-};
+}
 
 export default Login;

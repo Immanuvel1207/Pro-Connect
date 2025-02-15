@@ -1,0 +1,52 @@
+.projects-container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.project-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.project-card {
+  margin: 20px;
+  padding: 20px;
+  background-color: #f5f5f5;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  width: calc(33.33% - 20px);
+}
+
+.project-card h3 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+}
+
+.project-card p {
+  font-size: 1rem;
+  margin-bottom: 20px;
+}
+
+.project-card a {
+  text-decoration: none;
+  color: #337ab7;
+}
+
+.project-card a:hover {
+  color: #23527c;
+}
+
+/* Add this to prevent text from exceeding the page size */
+.project-card p {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Add this to prevent long words from exceeding the page size */
+.project-card p {
+  word-break: break-word;
+}

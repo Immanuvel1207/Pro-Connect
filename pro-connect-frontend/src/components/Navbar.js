@@ -1,64 +1,37 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Navbar, Nav, Container, Form, Button } from "react-bootstrap";
+import React, { useContext } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import './Navbar.css';
 
-const NavigationBar = () => {
-  const [searchTerm, setSearchTerm] = useState("");
+function Navbar() {
+  const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
-  const isAuthenticated = localStorage.getItem("token");
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/");
-  };
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    navigate(`/search?term=${searchTerm}`);
+    logout();
+    navigate('/');
   };
 
   return (
-    <Navbar bg="primary" variant="dark" expand="lg">
-      <Container>
-        <Navbar.Brand as={Link} to="/">Pro-Connect</Navbar.Brand>
-        <Navbar.Toggle aria-controls="basic-navbar-nav" />
-        <Navbar.Collapse id="basic-navbar-nav">
-          <Nav className="me-auto">
-            <Nav.Link as={Link} to="/">Home</Nav.Link>
-            {isAuthenticated && (
-              <>
-                <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
-                <Nav.Link as={Link} to="/messages">Messages</Nav.Link>
-              </>
-            )}
-          </Nav>
-          <Form className="d-flex" onSubmit={handleSearch}>
-            <Form.Control
-              type="search"
-              placeholder="Search projects or users"
-              className="me-2"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Button variant="outline-light" type="submit">Search</Button>
-          </Form>
-          <Nav>
-            {isAuthenticated ? (
-              <>
-                <Nav.Link as={Link} to="/profile">Profile</Nav.Link>
-                <Button variant="light" onClick={handleLogout}>Logout</Button>
-              </>
-            ) : (
-              <>
-                <Nav.Link as={Link} to="/login">Login</Nav.Link>
-                <Nav.Link as={Link} to="/register">Register</Nav.Link>
-              </>
-            )}
-          </Nav>
-        </Navbar.Collapse>
-      </Container>
-    </Navbar>
+    <nav style={{padding:'5px'}} className="navbar">
+      <Link to="/" className="navbar-brand" style={{color:'white',padding:'10px'}}>Pro Connect</Link>
+      <div className="navbar-links">
+        <Link to="/projects">Projects</Link>
+        {user ? (
+          <>
+            {/* <Link to="/dashboard">Dashboard</Link> */}
+            <Link to="/create-project">Create Project</Link>
+            <Link to="/profile">Profile</Link>
+            <button  style={{color:'white',background:'transparent'}} onClick={handleLogout}>Logout</button>
+          </>
+        ) : (
+          <>
+            <Link to="/login">Login</Link>
+            <Link to="/register">Register</Link>
+          </>
+        )}
+      </div>
+    </nav>
   );
-};
-
-export default NavigationBar;
+}
+export default Navbar;

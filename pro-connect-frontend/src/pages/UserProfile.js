@@ -1,67 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Container, Row, Col, Card } from 'react-bootstrap';
-import ProjectCard from '../components/ProjectCard';
+import axios from 'axios';
 
-const UserProfile = () => {
-  const [user, setUser] = useState(null);
-  const [projects, setProjects] = useState([]);
-  const { id } = useParams();
+function UserProfile() {
+  const [user, setUser] = useState({});
+  const [userProjects, setUserProjects] = useState([]);
 
   useEffect(() => {
-    fetchUserData();
-    fetchUserProjects();
-  }, [id]);
+    const fetchUserProfile = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/auth/user');
+        setUser(response.data);
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+    fetchUserProfile();
+  }, []);
 
-  const fetchUserData = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/users/profile/${id}`);
-      const data = await response.json();
-      setUser(data);
-    } catch (error) {
-      console.error('Error fetching user data:', error);
+  useEffect(() => {
+    const fetchUserProjects = async () => {
+      try {
+        const response = await axios.get(`http://localhost:5000/api/users/${user._id}/projects`);
+        setUserProjects(response.data);
+      } catch (error) {
+        console.error('Error fetching user projects:', error);
+      }
+    };
+    if (user._id) {
+      fetchUserProjects();
     }
-  };
-
-  const fetchUserProjects = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/projects/user/${id}`);
-      const data = await response.json();
-      setProjects(data);
-    } catch (error) {
-      console.error('Error fetching user projects:', error);
-    }
-  };
-
-  if (!user) return <div>Loading...</div>;
+  }, [user._id]);
 
   return (
-    <Container className="mt-4">
-      <Row>
-        <Col md={4}>
-          <Card>
-            <Card.Body>
-              <Card.Title>{user.name}</Card.Title>
-              <Card.Text>Email: {user.email}</Card.Text>
-              <Card.Text>GitHub: {user.githubID}</Card.Text>
-              <Card.Text>Skills: {user.skills.join(', ')}</Card.Text>
-              <Card.Text>College: {user.college}</Card.Text>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={8}>
-          <h2>{user.name}'s Projects</h2>
-          <Row>
-            {projects.map(project => (
-              <Col md={6} key={project._id}>
-                <ProjectCard project={project} />
-              </Col>
-            ))}
-          </Row>
-        </Col>
-      </Row>
-    </Container>
+    <div>
+      <h2>User Profile</h2>
+      <p>Name: {user.name}</p>
+      <p>Email: {user.email}</p>
+      <p>Username: {user.username}</p>
+      <h2>My Projects</h2>
+      <ul>
+        {userProjects.map((project) => (
+          <li key={project._id}>
+            <h3>{project.title}</h3>
+            <p>{project.description}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
-};
+}
 
 export default UserProfile;

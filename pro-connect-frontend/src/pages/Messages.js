@@ -1,137 +1,123 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Container, Row, Col, Form, Button, ListGroup } from 'react-bootstrap';
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import { AuthContext } from '../context/AuthContext';
 import io from 'socket.io-client';
+import './Messages.css';
 
-const socket = io('http://localhost:5000');
-
-const Messages = () => {
+function Messages() {
+  const { user } = useContext(AuthContext);
   const [conversations, setConversations] = useState([]);
   const [currentChat, setCurrentChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const socket = useRef();
   const scrollRef = useRef();
 
   useEffect(() => {
-    // Fetch user's conversations
-    const fetchConversations = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/messages/conversations', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        const data = await response.json();
-        setConversations(data);
-      } catch (error) {
-        console.error('Error fetching conversations:', error);
-      }
-    };
-
-    fetchConversations();
-
-    // Listen for incoming messages
-    socket.on('receive_message', (message) => {
-      setMessages((prevMessages) => [...prevMessages, message]);
+    socket.current = io('http://localhost:5000');
+    socket.current.on('getMessage', data => {
+      setMessages(prev => [...prev, data]);
     });
-
-    return () => {
-      socket.off('receive_message');
-    };
   }, []);
 
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    fetchConversations();
+  }, [user]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (newMessage.trim() && currentChat) {
-      const messageData = {
-        sender: localStorage.getItem('userId'),
-        content: newMessage,
-        conversationId: currentChat._id,
-      };
-
-      // Emit message to server
-      socket.emit('send_message', messageData);
-
-      // Add message to state
-      setMessages([...messages, messageData]);
-      setNewMessage('');
-
-      // Save message to database
-      try {
-        await fetch('http://localhost:5000/api/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify(messageData),
-        });
-      } catch (error) {
-        console.error('Error saving message:', error);
-      }
+  const fetchConversations = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/conversations/${user._id}`);
+      const data = await res.json();
+      setConversations(data);
+    } catch (err) {
+      console.log(err);
     }
   };
 
-  const handleChatChange = async (conversation) => {
-    setCurrentChat(conversation);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const message = {
+      sender: user._id,
+      text: newMessage,
+      conversationId: currentChat._id,
+    };
+
+    socket.current.emit('sendMessage', {
+      senderId: user._id,
+      receiverId: currentChat.members.find(member => member !== user._id),
+      text: newMessage,
+    });
+
     try {
-      const response = await fetch(`http://localhost:5000/api/messages/${conversation._id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      const res = await fetch('http://localhost:5000/api/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
       });
-      const data = await response.json();
-      setMessages(data);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
+      const data = await res.json();
+      setMessages([...messages, data]);
+      setNewMessage('');
+    } catch (err) {
+      console.log(err);
     }
   };
 
   return (
-    <Container className="mt-4">
-      <Row>
-        <Col md={4}>
-          <ListGroup>
-            {conversations.map((c) => (
-              <ListGroup.Item
-                key={c._id}
-                action
-                onClick={() => handleChatChange(c)}
-                active={currentChat && currentChat._id === c._id}
-              >
-                {c.participants.find(p => p._id !== localStorage.getItem('userId')).name}
-              </ListGroup.Item>
-            ))}
-          </ListGroup>
-        </Col>
-        <Col md={8}>
-          <div className="chat-box">
-            <div className="chat-messages">
-              {messages.map((m, index) => (
+    <div className="messages-container">
+      <div className="chat-menu">
+        <div className="chat-menu-wrapper">
+          <h3>Conversations</h3>
+          {conversations.map(c => (
+            <div
+              className="conversation"
+              key={c._id}
+              onClick={() => setCurrentChat(c)}
+            >
+              <span>{c.members.find(m => m !== user._id)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      <div className="chat-box">
+        {currentChat ? (
+          <div className="chat-box-wrapper">
+            <div className="chat-box-top">
+              {messages.map(m => (
                 <div
-                  key={index}
-                  className={`message ${m.sender === localStorage.getItem('userId') ? 'sent' : 'received'}`}
                   ref={scrollRef}
+                  className={`message ${m.sender === user._id ? "own" : ""}`}
                 >
-                  {m.content}
+                  <div className="message-content">
+                    <p>{m.text}</p>
+                    <div className="message-bottom">
+                      {new Date(m.createdAt).toLocaleTimeString()}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
-            <Form onSubmit={handleSubmit}>
-              <Form.Group className="mt-3">
-                <Form.Control
-                  type="text"
-                  placeholder="Type a message..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                />
-              </Form.Group>
-              <Button type="submit" className="mt-2">Send</Button>
-            </Form>
+            <form className="chat-box-bottom" onSubmit={handleSubmit}>
+              <textarea
+                className="chat-message-input"
+                placeholder="Write something..."
+                onChange={(e) => setNewMessage(e.target.value)}
+                value={newMessage}
+              ></textarea>
+              <button className="chat-submit-button" type="submit">
+                Send
+              </button>
+            </form>
           </div>
-        </Col>
-      </Row>
-    </Container>
+        ) : (
+          <span className="no-conversation-text">
+            Open a conversation to start a chat.
+          </span>
+        )}
+      </div>
+    </div>
   );
-};
+}
 
 export default Messages;

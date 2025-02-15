@@ -1,47 +1,31 @@
-const express = require("express");
-const dotenv = require("dotenv");
-const cors = require("cors");
-const connectDB = require("./config/db");
-const http = require("http");
-const socketIo = require("socket.io");
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const authRoutes = require('./routes/auth');
+const projectRoutes = require('./routes/projects');
+const userRoutes = require('./routes/users');
 
 dotenv.config();
-connectDB();
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
-  cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"],
-  },
-});
 
-app.use(express.json());
 app.use(cors());
+app.use(express.json());
 
-// Routes
-app.use("/api/auth", require("./routes/authRoutes"));
-app.use("/api/projects", require("./routes/projectRoutes"));
-app.use("/api/messages", require("./routes/messageRoutes"));
-app.use("/api/users", require("./routes/userRoutes"));
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch((err) => console.error('MongoDB connection error:', err));
 
-// Socket.io connection
-io.on("connection", (socket) => {
-  console.log("New client connected");
+app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/users', userRoutes);
 
-  socket.on("join_room", (roomId) => {
-    socket.join(roomId);
-  });
 
-  socket.on("send_message", (data) => {
-    io.to(data.roomId).emit("receive_message", data);
-  });
 
-  socket.on("disconnect", () => {
-    console.log("Client disconnected");
-  });
-});
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
